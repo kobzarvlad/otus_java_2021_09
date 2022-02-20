@@ -4,3 +4,7 @@ plugins {
 
 sourceCompatibility = JavaVersion.VERSION_17
 targetCompatibility = JavaVersion.VERSION_17
+
+dependencies {
+    implementation('org.assertj:assertj-core')
+}
