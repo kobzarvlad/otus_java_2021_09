@@ -3,23 +3,32 @@ package ru.otus.lib;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import ru.otus.annotations.After;
 import ru.otus.annotations.Before;
 import ru.otus.annotations.Test;
+import static ru.otus.lib.TestResult.FAILED;
+import static ru.otus.lib.TestResult.PASSED;
+import static ru.otus.lib.TestResult.SKIPPED;
 
 public class TestsRunner {
 
   public static <T> void runTests(Class<T> clazz) {
-    List<SingleTest<T>> tests = createTests(clazz);
-    long passedCount = tests.stream().map(TestsRunner::runTest).filter(Boolean::booleanValue).count();
-    System.out.printf("Total = %d. Passed = %d. Failed = %d.", tests.size(), passedCount, tests.size() - passedCount);
+    List<SingleTest> tests = createTests(clazz);
+    Map<TestResult, Long> resultMap = tests.stream()
+        .map(TestsRunner::runTest)
+        .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+
+    System.out.printf("Total = %d. Passed = %d. Skipped = %d. Failed = %d.%n",
+        tests.size(), resultMap.getOrDefault(PASSED, 0L), resultMap.getOrDefault(SKIPPED, 0L), resultMap.getOrDefault(FAILED, 0L));
   }
 
-  private static <T> List<SingleTest<T>> createTests(Class<T> clazz) {
+  private static <T> List<SingleTest> createTests(Class<T> clazz) {
     ClassInfo<T> classInfo = getClassInfo(clazz);
     return classInfo.tests().stream()
-        .map(test -> new SingleTest<>(ReflectionHelper.instantiate(classInfo.clazz()), classInfo.before(), test, classInfo.after()))
+        .map(test -> new SingleTest(ReflectionHelper.instantiate(classInfo.clazz()), classInfo.before(), test, classInfo.after()))
         .toList();
   }
 
@@ -45,33 +54,31 @@ public class TestsRunner {
         after = method;
       }
     }
-    return new ClassInfo<>(clazz, Optional.ofNullable(before), tests, Optional.ofNullable(after));
+    return new ClassInfo<>(clazz, before, tests, after);
   }
 
-  private static <T> boolean runTest(SingleTest<T> test) {
-    test.before().ifPresent(before -> {
-      try {
-        before.invoke(test.instance());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    });
+  private static <T> TestResult runTest(SingleTest test) {
+    TestResult result;
 
-    boolean passed = true;
-    try {
-      test.test().invoke(test.instance());
-    } catch (Exception e) {
-      passed = false;
+    if (invokeMethod(test.before(), test.instance()) == PASSED) {
+      result = invokeMethod(test.test(), test.instance());
+    } else {
+      result = SKIPPED;
     }
+    invokeMethod(test.after(), test.instance());
 
-    test.after().ifPresent(after -> {
+    return result;
+  }
+
+  private static <T> TestResult invokeMethod(Method method, Object instance) {
+    if (method != null) {
       try {
-        after.invoke(test.instance());
+        method.invoke(instance);
       } catch (Exception e) {
-        throw new RuntimeException(e);
+        e.printStackTrace();
+        return FAILED;
       }
-    });
-
-    return passed;
+    }
+    return PASSED;
   }
 }
