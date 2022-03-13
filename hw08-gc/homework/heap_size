@@ -1,0 +1,32 @@
+Ноут
+ThinkPad T490s
+20.04.1-Ubuntu
+
+
+До оптимизаций
+256 - oom
+512 - spend msec:15402, sec:15
+768 - spend msec:15263, sec:15
+1024 - spend msec:14901, sec:14
+1280 - spend msec:13067, sec:13
+1536 - spend msec:12702, sec:12
+1792 - spend msec:11865, sec:11
+2048 - spend msec:12483, sec:12
+2304 - spend msec:12848, sec:12
+
+Оптимальный размер хипа = 1792m
+
+
+После оптимизаций
+
+256 - oom
+512 - spend msec:7600, sec:7
+768 - spend msec:5277, sec:5
+1024 - spend msec:4187, sec:4
+1280 - spend msec:4276, sec:4
+1536 - spend msec:3780, sec:3
+1792 - spend msec:3713, sec:3
+2048 - spend msec:3637, sec:3
+2304 - spend msec:3929, sec:3
+
+Оптимальный размер хипа = 1536m
