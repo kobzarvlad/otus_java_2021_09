@@ -1,10 +1,14 @@
 package ru.otus.jdbc.demo;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import ru.otus.cachehw.HwCache;
+import ru.otus.cachehw.MyCache;
 import ru.otus.jdbc.core.repository.executor.DbExecutorImpl;
 import ru.otus.jdbc.core.sessionmanager.TransactionRunnerJdbc;
 import ru.otus.jdbc.crm.datasource.DriverManagerDataSource;
@@ -26,23 +30,30 @@ public class DbServiceDemo {
         var dbExecutor = new DbExecutorImpl();
 ///
         var clientTemplate = new ClientDataTemplateJdbc(dbExecutor); //реализация DataTemplate, заточена на Client
-
+        var clientCache = new MyCache<String, Client>();
 ///
-        var dbServiceClient = new DbServiceClientImpl(transactionRunner, clientTemplate);
-        dbServiceClient.saveClient(new Client("dbServiceFirst"));
+        // without cache
+        var dbServiceClientWithoutCache = new DbServiceClientImpl(transactionRunner, clientTemplate, clientCache, false);
+        List<Long> idsWithoutCache = new ArrayList<>();
+        for (int i = 0; i < 10_000; i++) {
+            idsWithoutCache.add(dbServiceClientWithoutCache.saveClient(new Client("name" + i)).getId());
+        }
+        long startTimeWithoutCache = System.currentTimeMillis();
+        idsWithoutCache.forEach(dbServiceClientWithoutCache::getClient);
+        long endTimeWithoutCache = System.currentTimeMillis();
 
-        var clientSecond = dbServiceClient.saveClient(new Client("dbServiceSecond"));
-        var clientSecondSelected = dbServiceClient.getClient(clientSecond.getId())
-                .orElseThrow(() -> new RuntimeException("Client not found, id:" + clientSecond.getId()));
-        log.info("clientSecondSelected:{}", clientSecondSelected);
-///
-        dbServiceClient.saveClient(new Client(clientSecondSelected.getId(), "dbServiceSecondUpdated"));
-        var clientUpdated = dbServiceClient.getClient(clientSecondSelected.getId())
-                .orElseThrow(() -> new RuntimeException("Client not found, id:" + clientSecondSelected.getId()));
-        log.info("clientUpdated:{}", clientUpdated);
+        // with cache
+        var dbServiceClientWithCache = new DbServiceClientImpl(transactionRunner, clientTemplate, clientCache, true);
+        List<Long> idsWithCache = new ArrayList<>();
+        for (int i = 0; i < 10_000; i++) {
+            idsWithCache.add(dbServiceClientWithCache.saveClient(new Client("name" + i)).getId());
+        }
+        long startTimeWithCache = System.currentTimeMillis();
+        idsWithCache.forEach(dbServiceClientWithCache::getClient);
+        long endTimeWithCache = System.currentTimeMillis();
 
-        log.info("All clients");
-        dbServiceClient.findAll().forEach(client -> log.info("client:{}", client));
+        log.info("Selected 10_000 clients without cache. Spent time = {}", endTimeWithoutCache - startTimeWithoutCache);
+        log.info("Selected 10_000 clients with cache. Spent time = {}", endTimeWithCache - startTimeWithCache);
     }
 
     private static void flywayMigrations(DataSource dataSource) {
@@ -51,6 +62,7 @@ public class DbServiceDemo {
                 .dataSource(dataSource)
                 .locations("classpath:/db/migration")
                 .load();
+        flyway.clean();
         flyway.migrate();
         log.info("db migration finished.");
         log.info("***");
