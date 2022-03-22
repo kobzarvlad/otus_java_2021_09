@@ -1,33 +1,43 @@
 package ru.otus.server;
 
-import com.google.gson.Gson;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import ru.otus.dao.UserDao;
+import ru.otus.dao.ClientDao;
 import ru.otus.helpers.FileSystemHelper;
+import ru.otus.services.ClientAuthService;
 import ru.otus.services.TemplateProcessor;
-import ru.otus.servlet.UsersApiServlet;
-import ru.otus.servlet.UsersServlet;
+import ru.otus.servlet.AuthorizationFilter;
+import ru.otus.servlet.ClientsServlet;
+import ru.otus.servlet.LoginServlet;
 
 
-public class UsersWebServerSimple implements UsersWebServer {
+import java.util.Arrays;
+
+public class ClientsWebServerWithFilterBasedSecurity implements ClientsWebServer {
+
     private static final String START_PAGE_NAME = "index.html";
     private static final String COMMON_RESOURCES_DIR = "static";
 
-    private final UserDao userDao;
-    private final Gson gson;
-    protected final TemplateProcessor templateProcessor;
     private final Server server;
+    private final ClientAuthService authService;
+    private final ClientDao clientDao;
+    protected final TemplateProcessor templateProcessor;
 
-    public UsersWebServerSimple(int port, UserDao userDao, Gson gson, TemplateProcessor templateProcessor) {
-        this.userDao = userDao;
-        this.gson = gson;
+    public ClientsWebServerWithFilterBasedSecurity(
+        int port,
+        ClientAuthService authService,
+        ClientDao clientDao,
+        TemplateProcessor templateProcessor
+    ) {
+        this.authService = authService;
+        this.clientDao = clientDao;
         this.templateProcessor = templateProcessor;
-        server = new Server(port);
+        this.server = new Server(port);
     }
 
     @Override
@@ -55,15 +65,10 @@ public class UsersWebServerSimple implements UsersWebServer {
 
         HandlerList handlers = new HandlerList();
         handlers.addHandler(resourceHandler);
-        handlers.addHandler(applySecurity(servletContextHandler, "/users", "/api/user/*"));
-
+        handlers.addHandler(applySecurity(servletContextHandler, "/clients"));
 
         server.setHandler(handlers);
         return server;
-    }
-
-    protected Handler applySecurity(ServletContextHandler servletContextHandler, String ...paths) {
-        return servletContextHandler;
     }
 
     private ResourceHandler createResourceHandler() {
@@ -76,8 +81,14 @@ public class UsersWebServerSimple implements UsersWebServer {
 
     private ServletContextHandler createServletContextHandler() {
         ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
-        servletContextHandler.addServlet(new ServletHolder(new UsersServlet(templateProcessor, userDao)), "/users");
-        servletContextHandler.addServlet(new ServletHolder(new UsersApiServlet(userDao, gson)), "/api/user/*");
+        servletContextHandler.addServlet(new ServletHolder(new ClientsServlet(clientDao, templateProcessor)), "/clients");
+        return servletContextHandler;
+    }
+
+    protected Handler applySecurity(ServletContextHandler servletContextHandler, String... paths) {
+        servletContextHandler.addServlet(new ServletHolder(new LoginServlet(templateProcessor, authService)), "/login");
+        AuthorizationFilter authorizationFilter = new AuthorizationFilter();
+        Arrays.stream(paths).forEachOrdered(path -> servletContextHandler.addFilter(new FilterHolder(authorizationFilter), path, null));
         return servletContextHandler;
     }
 }

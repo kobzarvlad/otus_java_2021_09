@@ -1,0 +1,53 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Клиенты</title>
+</head>
+
+<body>
+
+<h4>Создать клиента</h4>
+<form action="../clients" method="post">
+    <input type="text" name="name" placeholder="Имя">
+    <input type="text" name="login" placeholder="Логин">
+    <input type="text" name="password" placeholder="Пароль">
+    <input type="text" name="street" placeholder="Адрес">
+    <input type="text" name="phoneNumber1" placeholder="Телефон1">
+    <input type="text" name="phoneNumber2" placeholder="Телефон2">
+    <input type="submit" value="Создать">
+</form>
+
+<h4>Список клиентов</h4>
+<table style="width: 800px">
+    <thead>
+    <tr>
+        <td style="width: 50px">Id</td>
+        <td style="width: 150px">Имя</td>
+        <td style="width: 100px">Логин</td>
+        <td style="width: 100px">Пароль</td>
+        <td style="width: 200px">Адрес</td>
+        <td style="width: 200px">Телефоны</td>
+    </tr>
+    </thead>
+    <tbody>
+        <#list clients as client>
+        <tr>
+            <td>${client.id}</td>
+            <td>${client.name}</td>
+            <td>${client.login}</td>
+            <td>${client.password}</td>
+            <#if client.address??>
+            <td>${client.address.street}</td>
+            <#else>
+            <td></td>
+            </#if>
+            <#if client.phones?? && client.phones?has_content>
+            <td><#list client.phones as phone> ${phone.number}<#sep>, </#list></td>
+            <#else>
+            <td></td>
+            </#if>
+        </tr>
+        </#list>
+    </tbody>
+</table>
+</body>
+</html>
